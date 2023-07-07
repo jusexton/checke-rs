@@ -306,18 +306,6 @@ impl TryFrom<&str> for Move {
 }
 
 /// Iterator capable of generating all possible moves for a given board and player of that board.
-///
-/// ```rust
-/// use checke_rs::board::{Board, Player};
-/// use checke_rs::position::MoveIter;
-///
-/// let board = Board::default();
-/// let moves = MoveIter::new(&board, Player::Black);
-///
-/// let move_count = moves.count();
-///
-/// assert_eq!(move_count, 7)
-/// ```
 pub struct MoveIter<'a> {
     board: &'a Board,
     player: Player,

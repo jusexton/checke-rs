@@ -1,5 +1,5 @@
 # checke-rs
 
-Fast and idiomatic rust checkers engine.
+![](https://github.com/jsextonn/checke-rs/workflows/build/badge.svg)
 
-## Contributing
+Feature rich and easy to use checkers engine written in the rust programming language.
