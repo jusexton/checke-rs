@@ -1,13 +1,16 @@
 [package]
 name = "checke-rs"
+description = "Feature rich and easy to use checkers engine."
+authors = ["Justin Sexton"]
 version = "0.0.1"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/JSextonn/checke-rs"
 
 [dependencies]
 num = "0.4.0"
-num-derive = "0.3.3"
+num-derive = "0.4.0"
 num-traits = "0.2.15"
 
 lazy_static = "1.4.0"
