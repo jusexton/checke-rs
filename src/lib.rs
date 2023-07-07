@@ -1,5 +1,5 @@
 //! # Checke-rs
-//! A checkers engine exposing features around managing board state is the cleanest way possible.
+//! A checkers engine exposing features around managing board state in the cleanest way possible.
 
 pub mod board;
 pub mod bitboard;
