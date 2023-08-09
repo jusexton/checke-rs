@@ -32,3 +32,9 @@ fn main() {
 ## Warning
 
 This library is still under heavy development and breaking changes to the API are almost a certainty!
+
+## License
+
+This project is licensed under the [MIT license].
+
+[mit license]: https://github.com/JSextonn/checke-rs/blob/master/LICENSE

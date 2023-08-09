@@ -2,8 +2,8 @@ use std::convert::Infallible;
 
 use crate::position::{Move, NotationError};
 
-/// Construct representing many moves at once. Necessary due to checkers allowing multiple
-/// jumps per turn.
+/// Represents a turn on a board. Turns are simply an abstraction around a collection of moves.
+/// Multiple moves are allowed per turn due to checkers allowing multiple jumps per turn.
 pub struct Turn {
     moves: Vec<Move>,
 }
@@ -36,6 +36,7 @@ impl Turn {
     }
 }
 
+/// Allows strings of checkers notation to be easily converted into turn instances.
 impl TryFrom<&str> for Turn {
     type Error = NotationError;
 
@@ -44,6 +45,8 @@ impl TryFrom<&str> for Turn {
     }
 }
 
+/// Allows array of any value that can be converted into a [Move]
+/// to be easily converted into turn instances.
 impl<T, const N: usize> TryFrom<[T; N]> for Turn where T: Into<Move> {
     type Error = Infallible;
 

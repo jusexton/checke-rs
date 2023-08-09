@@ -147,6 +147,7 @@ impl BoardState {
     }
 }
 
+/// A board value is used to track and moderate the progress of a checkers game.
 #[derive(Debug)]
 pub struct Board {
     state_stack: VecDeque<BoardState>,

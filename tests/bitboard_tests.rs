@@ -30,7 +30,7 @@ fn test_sub_boards_are_calculated_correctly() {
 }
 
 #[test]
-fn test_pieces_returns_correct_bitboards() {
+fn test_cell_iter_returns_correct_bitboards() {
     let bb = BitBoard::new(0b00100100001);
 
     let pieces = bb.used_cells().collect::<Vec<MonoBitBoard>>();
@@ -44,7 +44,7 @@ fn test_pieces_returns_correct_bitboards() {
 }
 
 #[test]
-fn test_cell_iter() {
+fn test_cell_iter_range_limits() {
     let bitboard = BitBoard::new(0b10000000_00000000_00000000_00000000_00000000_00000000_00000001);
     let pieces = CellIter::new(bitboard);
 
