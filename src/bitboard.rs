@@ -1,4 +1,4 @@
-use std::ops::{BitAnd, BitOr};
+use std::ops::{BitAnd, BitOr, BitXor, BitXorAssign, Range};
 
 use thiserror::Error;
 
@@ -29,8 +29,12 @@ pub const BOTTOM_SQUARES: BitBoard = BitBoard(0x00000000000000FF);
 /// Represents all top and bottom squares on a checkers board.
 pub const TOP_AND_BOTTOM_SQUARES: BitBoard = BitBoard(0xFF000000000000FF);
 
-/// Bit representation of a checkers board. Backed by 64 bits and exposes various bit operations
-/// that make board calculations easy and fast.
+/// Bit representation of a checkers board. Backed by 64 bits; a bitboard uses bits to represent
+/// each square on the board. Multiple bitboards are generally used to track different information.
+/// These boards can then make use of bit operations to quickly determine the full context of the
+/// board. This bitboard implementation not only exposes various bit operations but other domain
+/// specific helpers closely related to bitboard calculation that make board
+/// calculations easy and fast.
 #[derive(Copy, Clone, Debug)]
 pub struct BitBoard(u64);
 
@@ -41,52 +45,18 @@ impl BitBoard {
     }
 
     /// Calculates whether this bitboard is empty. A bitboard is considered empty if no
-    /// bits have the value of 1.
-    ///
-    /// ```rust
-    /// use checke_rs::bitboard::BitBoard;
-    ///
-    /// let bb = BitBoard::new(0b00000);
-    ///
-    /// assert!(bb.empty())
-    /// ```
+    /// bits have the value of 1. In other words, the value is 0.
     pub fn empty(&self) -> bool {
         self.0 == 0
     }
 
-    /// Returns a list of isolated bitboards representing each piece contained on this
-    /// bitboard instance.
-    ///
-    /// ```rust
-    /// use checke_rs::bitboard::BitBoard;
-    ///
-    /// let bb = BitBoard::new(0b001010);
-    /// let pieces = bb.pieces();
-    ///
-    /// assert_eq!(pieces.len(), 2);
-    /// ```
-    pub fn pieces(&self) -> Vec<MonoBitBoard> {
-        let mut result = Vec::new();
-        for index in 0..64 {
-            if (self.0 & (1 << index)) != 0 {
-                result.push(MonoBitBoard(1 << index))
-            }
-        }
-
-        result
+    /// Returns a [CellIter] that will be capable of iterating over every active bit on this board.
+    pub fn used_cells(&self) -> CellIter {
+        CellIter::new(*self)
     }
 
     /// Calculates whether the given [MonoBitBoard] overlaps with this bitboard instance.
     /// A bitboard overlaps with another when they have at least one bit in common.
-    ///
-    /// ```
-    /// use checke_rs::bitboard::{BitBoard, MonoBitBoard};
-    ///
-    /// let position = MonoBitBoard::new(0b010).unwrap();
-    /// let bitboard = BitBoard::new(0b101010);
-    ///
-    /// assert!(bitboard.contains(position));
-    /// ```
     pub fn contains(&self, bitboard: MonoBitBoard) -> bool {
         !(*self & bitboard).empty()
     }
@@ -124,11 +94,25 @@ impl BitOr<MonoBitBoard> for BitBoard {
     }
 }
 
+impl BitXor for BitBoard {
+    type Output = BitBoard;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        BitBoard(self.0 ^ rhs.0)
+    }
+}
+
+impl BitXorAssign for BitBoard {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.0 ^= rhs.0
+    }
+}
+
 #[derive(Debug, Error)]
-#[error("MonoBitBoard can only be constructed with a value that contains a single bit of 1.")]
+#[error("MonoBitBoard can only be constructed with a value that contains a single bit with the value of 1.")]
 pub struct MonoBitBoardError;
 
-/// Special kind of bitboard that enforces that only a single bit has the value of 1.
+/// Special type of bitboard that enforces that only a single bit has the value of 1.
 /// This can be useful when representing a piece or single cell using bitboard and type safety.
 #[derive(Copy, Clone, Debug)]
 pub struct MonoBitBoard(u64);
@@ -138,12 +122,25 @@ impl MonoBitBoard {
     pub fn new(value: u64) -> Result<Self, MonoBitBoardError> {
         let is_single_piece = value != 0 && (value & (value - 1)) == 0;
         match is_single_piece {
-            true => {
-                let result = MonoBitBoard(value);
-                Ok(result)
-            }
+            true => Ok(MonoBitBoard(value)),
             false => Err(MonoBitBoardError)
         }
+    }
+}
+
+impl BitAnd for MonoBitBoard {
+    type Output = BitBoard;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        BitBoard(self.0 & rhs.0)
+    }
+}
+
+impl BitOr for MonoBitBoard {
+    type Output = BitBoard;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        BitBoard(self.0 | rhs.0)
     }
 }
 
@@ -156,7 +153,7 @@ impl TryFrom<BitBoard> for MonoBitBoard {
     }
 }
 
-macro_rules! impl_common {
+macro_rules! impl_equals {
     ($x:ident, $y:ident) => {
         impl PartialEq for $x {
             fn eq(&self, other: &Self) -> bool { self.0 == other.0 }
@@ -174,5 +171,28 @@ macro_rules! impl_common {
     }
 }
 
-impl_common!(MonoBitBoard, BitBoard);
-impl_common!(BitBoard, MonoBitBoard);
+impl_equals!(MonoBitBoard, BitBoard);
+impl_equals!(BitBoard, MonoBitBoard);
+
+/// Iterator capable of producing a [MonoBitBoard] for each active cell of a given [BitBoard].
+pub struct CellIter {
+    bitboard: BitBoard,
+    iter: Range<usize>,
+}
+
+impl CellIter {
+    /// Creates a new iterator instance with the given [BitBoard]
+    pub fn new(bitboard: BitBoard) -> Self {
+        CellIter { bitboard, iter: 0..64 }
+    }
+}
+
+impl Iterator for CellIter {
+    type Item = MonoBitBoard;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.by_ref()
+            .find(|index| self.bitboard.0 & (1 << index) != 0)
+            .map(|index| MonoBitBoard::new(1 << index).unwrap())
+    }
+}

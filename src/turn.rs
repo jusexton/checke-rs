@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use crate::position::{Move, NotationError};
 
 /// Construct representing many moves at once. Necessary due to checkers allowing multiple
@@ -7,19 +9,19 @@ pub struct Turn {
 }
 
 impl Turn {
-    /// Creates a [Turn] instance from the given move vector.
-    pub fn new(moves: Vec<Move>) -> Self {
-        Turn { moves }
+    /// Construct a turn from an iterable of items that can be converted into [Move] instances.
+    pub fn new<T, I>(moves: I) -> Result<Self, T::Error>
+        where T: TryInto<Move>,
+              I: IntoIterator<Item=T> {
+        let move_results = moves
+            .into_iter()
+            .map(|m| m.try_into())
+            .collect::<Result<Vec<Move>, T::Error>>();
+
+        move_results.map(|moves| Turn { moves })
     }
 
-    /// Attempts tp create  a [Turn] instance using checkers notation.
-    /// ```rust
-    /// use checke_rs::turn::Turn;
-    ///
-    /// let turn = Turn::try_from("9x18,18x25").unwrap();
-    ///
-    /// assert_eq!(turn.moves().len(), 2)
-    /// ```
+    /// Attempts tp create a [Turn] instance using checkers notation.
     pub fn from_notation(text: &str) -> Result<Self, NotationError> {
         let parse_result: Result<Vec<Move>, NotationError> = text.split(',')
             .map(Move::try_from)
@@ -28,23 +30,24 @@ impl Turn {
         parse_result.map(|moves| Turn { moves })
     }
 
-    pub fn moves(&self) -> Vec<Move> {
-        self.moves.to_vec()
+    /// Returns a reference to all moves that represent this turn in the order they should be made.
+    pub fn moves(&self) -> &Vec<Move> {
+        &self.moves
     }
 }
 
 impl TryFrom<&str> for Turn {
     type Error = NotationError;
 
-    /// Attempts to convert string slice into a [Turn] instance using checkers notation.
-    /// ```rust
-    /// use checke_rs::turn::Turn;
-    ///
-    /// let turn = Turn::try_from("9x18,18x25").unwrap();
-    ///
-    /// assert_eq!(turn.moves().len(), 2)
-    /// ```
-    fn try_from(text: &str) -> Result<Self, Self::Error> {
-        Turn::from_notation(text)
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Turn::from_notation(value)
+    }
+}
+
+impl<T, const N: usize> TryFrom<[T; N]> for Turn where T: Into<Move> {
+    type Error = Infallible;
+
+    fn try_from(value: [T; N]) -> Result<Self, Self::Error> {
+        Ok(Turn::new(value).unwrap())
     }
 }

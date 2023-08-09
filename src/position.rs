@@ -1,62 +1,20 @@
+use std::convert::Infallible;
+
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
 use thiserror::Error;
 
-use crate::bitboard::{
-    BOTTOM_SQUARES,
-    LEFT_SQUARES,
-    MonoBitBoard,
-    RIGHT_SQUARES,
-    TOP_SQUARES,
-};
-use crate::board::{Board, Player};
-
-#[derive(PartialEq, Debug)]
-pub enum Position {
-    Bottom,
-    Left,
-    BottomLeft,
-    BottomRight,
-    Top,
-    Right,
-    TopRight,
-    TopLeft,
-    Interior,
-}
-
-impl From<MonoBitBoard> for Position {
-    fn from(bitboard: MonoBitBoard) -> Self {
-        let is_left = LEFT_SQUARES.contains(bitboard);
-        let is_right = RIGHT_SQUARES.contains(bitboard);
-        let is_top = TOP_SQUARES.contains(bitboard);
-        let is_bottom = BOTTOM_SQUARES.contains(bitboard);
-
-        match (is_left, is_right, is_top, is_bottom) {
-            (false, false, false, true) => Position::Bottom,
-            (true, false, false, false) => Position::Left,
-            (true, false, false, true) => Position::BottomLeft,
-            (false, true, false, true) => Position::BottomRight,
-            (false, false, true, false) => Position::Top,
-            (false, true, false, false) => Position::Right,
-            (false, true, true, false) => Position::TopRight,
-            (true, false, true, false) => Position::TopLeft,
-            (false, false, false, false) => Position::Interior,
-            _ => panic!("This should be impossible to reach.")
-        }
-    }
-}
+use crate::bitboard::{BitBoard, CellIter, MonoBitBoard};
+use crate::board::{BoardState, Player};
 
 /// Error denoting an issue parsing checkers notation.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub enum NotationError {
     #[error("Provided value did not conform to a valid checkers notation format.")]
     InvalidFormat,
 
     #[error("Provided value operates outside the realm of a classical checkers board.")]
     OutOfRange,
-
-    #[error("Provided value represented a piece standing still. The destination square was equal to the source.")]
-    Idle,
 }
 
 #[derive(Debug, Error)]
@@ -102,14 +60,6 @@ pub enum Square {
 
 impl Square {
     /// Provides an iterator over all square values.
-    ///
-    /// ```
-    /// use checke_rs::position::Square;
-    ///
-    /// let square_count = Square::iter().count();
-    ///
-    /// assert_eq!(square_count, 32)
-    /// ```
     pub fn iter() -> impl Iterator<Item=Self> {
         [
             Square::One, Square::Two, Square::Three, Square::Four,
@@ -123,9 +73,15 @@ impl Square {
         ].iter().copied()
     }
 
-    /// Creates a [BitCell] representing this square instance.
-    pub fn to_bitboard(&self) -> MonoBitBoard {
-        let value = match self {
+    /// Returns the square instance represented as a u8.
+    pub fn to_number(&self) -> u8 {
+        num::ToPrimitive::to_u8(self).unwrap()
+    }
+}
+
+impl From<Square> for MonoBitBoard {
+    fn from(value: Square) -> Self {
+        let value = match value {
             Square::One => 0x4000000000000000,
             Square::Two => 0x1000000000000000,
             Square::Three => 0x400000000000000,
@@ -161,24 +117,12 @@ impl Square {
         };
         MonoBitBoard::new(value).unwrap()
     }
-
-    /// Returns the square instance represented as a u8.
-    ///
-    /// ```rust
-    /// use checke_rs::position::Square;
-    ///
-    /// let number = Square::One.to_number();
-    ///
-    /// assert_eq!(number, 1)
-    /// ```
-    pub fn to_number(&self) -> u8 {
-        num::ToPrimitive::to_u8(self).unwrap()
-    }
 }
 
 impl TryFrom<u8> for Square {
     type Error = NotationError;
 
+    /// Converts a number to its square representation.
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         num::FromPrimitive::from_u8(value).ok_or(NotationError::OutOfRange)
     }
@@ -187,6 +131,7 @@ impl TryFrom<u8> for Square {
 impl TryFrom<&str> for Square {
     type Error = NotationError;
 
+    /// Converts a number in string format to its square representation
     fn try_from(text: &str) -> Result<Self, Self::Error> {
         let value = text.parse::<u8>().map_err(|_| NotationError::InvalidFormat)?;
         Square::try_from(value)
@@ -196,75 +141,40 @@ impl TryFrom<&str> for Square {
 impl TryFrom<MonoBitBoard> for Square {
     type Error = SquareConversionError;
 
-    /// Converts the given [MonoBitBoard] to a [Square] instance.
-    ///
-    /// ```
-    /// use checke_rs::bitboard::MonoBitBoard;
-    /// use checke_rs::position::Square;
-    ///
-    /// let expected_square = Square::ThirtyTwo;
-    /// let bitboard = expected_square.to_bitboard();
-    /// let converted_square = Square::try_from(bitboard).unwrap();
-    ///
-    /// assert_eq!(converted_square, expected_square)
-    /// ```
-    ///
-    /// Raises an error when the given [MonoBitBoard] could not be converted
-    /// to a classical checkers square.
-    ///
-    /// ```
-    /// use checke_rs::bitboard::MonoBitBoard;
-    /// use checke_rs::position::Square;
-    ///
-    /// let bitboard = MonoBitBoard::new(0b1).unwrap();
-    /// let result = Square::try_from(bitboard);
-    ///
-    /// assert!(result.is_err())
-    /// ```
+    /// Converts the given [MonoBitBoard] to a [Square] instance. Results in an error when
+    /// the given bitboard did not represent one of the 32 classical checker squares.
     fn try_from(bitboard: MonoBitBoard) -> Result<Self, Self::Error> {
         Square::iter()
-            .find(|square| square.to_bitboard() == bitboard)
+            .find(|square| MonoBitBoard::from(*square) == bitboard)
             .ok_or(SquareConversionError)
     }
 }
 
-/// Represents a move that can occur on a board. A move is represented by the source square
-/// and the destination square.
-#[derive(Copy, Clone, Debug)]
-pub struct Move(pub Square, pub Square);
+/// Represents a move that can occur on a board. A move is represented by a source and destination.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Move {
+    source: MonoBitBoard,
+    destination: MonoBitBoard,
+}
 
 impl Move {
-    /// Creates a new [Move] instance from two given squares.
+    /// Creates a new [Move] instance from two given [MonoBitBoard]s.
     /// Move instances have no context of a board or any checkers rules. Moves are simply
-    /// a source and destination square. Move validation is expected to be done via other
-    /// mechanisms.
-    ///
-    /// Basic usage:
-    /// ```
-    /// use checke_rs::position::{Move, Square};
-    ///
-    /// let Move(source, dest) = Move::new(Square::Eight, Square::Nine).unwrap();
-    ///
-    /// assert_eq!(source, Square::Eight);
-    /// assert_eq!(dest, Square::Nine);
-    /// ```
-    pub fn new(source: Square, destination: Square) -> Result<Self, NotationError> {
-        match source != destination {
-            true => Ok(Move(source, destination)),
-            false => Err(NotationError::Idle)
-        }
+    /// a source and destination. Move validation is expected to be done via other mechanisms.
+    pub fn new(source: MonoBitBoard, destination: MonoBitBoard) -> Self {
+        Move { source, destination }
+    }
+
+    /// Creates a new [Move] instance from two given squares. Move instances have no context of
+    /// a board or any checkers rules. Moves are simply a source and destination square.
+    /// Move validation is expected to be done via other mechanisms.
+    pub fn from_squares(source: Square, destination: Square) -> Self {
+        let source = MonoBitBoard::from(source);
+        let destination = MonoBitBoard::from(destination);
+        Move { source, destination }
     }
 
     /// Create a new [Move] instance using the given checkers notation text.
-    ///
-    /// ```rust
-    /// use checke_rs::position::{Move, Square};
-    ///
-    /// let Move(source, dest) = Move::from_notation("18x25").unwrap();
-    ///
-    /// assert_eq!(source, Square::Eighteen);
-    /// assert_eq!(dest, Square::TwentyFive);
-    /// ```
     pub fn from_notation(text: &str) -> Result<Self, NotationError> {
         lazy_static! {
             static ref CN_PATTERN: Regex = Regex::new(r"^([1-9]+[0-9]*)([-xX])([1-9]+[0-9]*)$").unwrap();
@@ -283,52 +193,292 @@ impl Move {
         let source = Square::try_from(source_text)?;
         let dest = Square::try_from(dest_text)?;
 
-        Move::new(source, dest)
+        Ok(Move::from_squares(source, dest))
     }
+
+    /// Retrieves a copy of this moves source.
+    pub fn source(&self) -> MonoBitBoard {
+        self.source
+    }
+
+    /// Retrieves a copy of this moves destination.
+    pub fn destination(&self) -> MonoBitBoard {
+        self.destination
+    }
+
+    /// Returns a bitboard representing the squares that will change if the move is applied.
+    /// This value will be useful when updating a bitboard with a move by applying an xor.
+    pub fn to_bitboard(&self) -> BitBoard { self.source | self.destination }
 }
 
 impl TryFrom<&str> for Move {
     type Error = NotationError;
 
     /// Converts a string slice representing checkers notation into a [Move] instance.
-    ///
-    /// ```rust
-    /// use checke_rs::position::{Move, Square};
-    ///
-    /// let Move(source, dest) = Move::try_from("18x25").unwrap();
-    ///
-    /// assert_eq!(source, Square::Eighteen);
-    /// assert_eq!(dest, Square::TwentyFive);
-    /// ```
     fn try_from(text: &str) -> Result<Self, Self::Error> {
         Move::from_notation(text)
     }
 }
 
-/// Iterator capable of generating all possible moves for a given board and player of that board.
-pub struct MoveIter<'a> {
-    board: &'a Board,
+impl TryFrom<(MonoBitBoard, MonoBitBoard)> for Move {
+    type Error = Infallible;
+
+    /// Converts a tuple of [MonoBitBoard] into a [Move] instance.
+    fn try_from(value: (MonoBitBoard, MonoBitBoard)) -> Result<Self, Self::Error> {
+        Ok(Move::new(value.0, value.1))
+    }
+}
+
+impl TryFrom<(Square, Square)> for Move {
+    type Error = Infallible;
+
+    /// Converts a tuple of [Square] into a [Move] instance.
+    fn try_from(value: (Square, Square)) -> Result<Self, Self::Error> {
+        let m = Self {
+            source: MonoBitBoard::from(value.0),
+            destination: MonoBitBoard::from(value.1),
+        };
+        Ok(m)
+    }
+}
+
+const RED_PIECE_MOVES: &[BitBoard; 32] = &[
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b01000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b01010000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00010100_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000101_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00010000_10100000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b01000100_00101000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00010001_00001010_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000100_00000010_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00100000_01000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_10001000_01010000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00100010_00010100_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00001000_00000101_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00010000_10100000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_01000100_00101000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00010001_00001010_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000100_00000010_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00100000_01000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_10001000_01010000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00100010_00010100_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00001000_00000101_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00010000_10100000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_01000100_00101000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00010001_00001010_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000100_00000010_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00100000_01000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_10001000_01010000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00100010_00010100_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00001000_00000101_00000000)
+];
+
+const BLACK_PIECE_MOVES: &[BitBoard; 32] = &[
+    BitBoard::new(0b00000000_10100000_00010000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00101000_01000100_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00001010_00010001_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000010_00000100_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_01000000_00100000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_01010000_10001000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00010100_00100010_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000101_00001000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_10100000_00010000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00101000_01000100_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00001010_00010001_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000010_00000100_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_01000000_00100000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_01010000_10001000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00010100_00100010_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000101_00001000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_10100000_00010000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00101000_01000100_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00001010_00010001_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000010_00000100_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_01000000_00100000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_01010000_10001000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00010100_00100010),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000101_00001000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_10100000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00101000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00001010),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000010),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000)
+];
+
+const KING_MOVES: &[BitBoard; 32] = &[
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000)
+];
+
+/// Capable of generating all possible moves. The key different between [MoveGenerator]
+/// and [MoveIter] is that [MoveIter] only yields valid moves in the context of the provided
+/// [BoardState]. [MoveGenerator] blindly yields all the legal moves a particular piece can have.
+struct MoveGenerator<'a> {
+    board_state: &'a BoardState,
     player: Player,
-    piece_index: u8,
+}
+
+impl<'a> MoveGenerator<'a> {
+    /// Creates a new [MoveGenerator] instance given a [BoardState] reference and [Player].
+    pub fn new(board_state: &'a BoardState, player: Player) -> Self {
+        MoveGenerator { board_state, player }
+    }
+
+    /// Provides an iterator of moves given a specific board cell.
+    pub fn by_cell(&self, cell: MonoBitBoard) -> impl Iterator<Item=Move> {
+        let inf_cell_iter = [cell].into_iter().cycle();
+        let moves_by_cell = self.moves_by_cell(cell);
+        inf_cell_iter.zip(moves_by_cell).map(|m| Move::try_from(m).unwrap())
+    }
+
+    fn moves_by_cell(&self, cell: MonoBitBoard) -> CellIter {
+        self.get_move_bitboard(self.board_state, self.player, cell)
+            .unwrap_or(&BitBoard::new(0))
+            .used_cells()
+    }
+
+    fn get_move_bitboard(&self,
+                         board_state: &BoardState,
+                         player: Player,
+                         cell: MonoBitBoard) -> Option<&BitBoard> {
+        let Ok(square) = Square::try_from(cell) else { return None; };
+
+        let move_index = (square.to_number() - 1) as usize;
+        let is_king = board_state.is_king(cell);
+        let move_bitboard = match is_king {
+            true => KING_MOVES.get(move_index),
+            false => match player {
+                Player::Red => RED_PIECE_MOVES.get(move_index),
+                Player::Black => BLACK_PIECE_MOVES.get(move_index)
+            }
+        };
+
+        move_bitboard
+    }
+}
+
+/// Error that can occur while performing a move action.
+#[derive(Debug, Error, PartialEq)]
+pub enum MoveError {
+    #[error("Move data was incorrectly formed. Ensure that the source and destination values are valid squares.")]
+    InvalidConstruction,
+
+    #[error("A piece did not exist at the provided source square.")]
+    NoPieceAtSource,
+
+    #[error("The selected piece to move did not belong to the player color that was allowed to move.")]
+    WrongPlayerPiece,
+
+    #[error("The provided destination was illegal. The selected piece can not legally move to the provided destination.")]
+    IllegalDestination,
+
+    #[error("Moves can no longer be made on a board that been completed.")]
+    GameConcluded,
+
+    #[error("The destination was already occupied by a player piece.")]
+    DestinationOccupied,
+}
+
+/// Capable of validating that a given move is valid provided additional [BoardState] context.
+pub struct MoveValidator<'a> {
+    board_state: &'a BoardState,
+}
+
+impl<'a> MoveValidator<'a> {
+    /// Creates a new [MoveValidator] instance from the given [BoardState].
+    pub fn new(board_state: &'a BoardState) -> Self {
+        MoveValidator { board_state }
+    }
+
+    /// Validates a given move is valid per this validator's board state.
+    pub fn validate<T>(&self, m: T) -> Result<(), MoveError> where T: TryInto<Move> {
+        let m = m.try_into().map_err(|_| MoveError::InvalidConstruction)?;
+
+        self.valid_piece_selection(&m)?;
+        self.valid_destination(&m)?;
+
+        Ok(())
+    }
+
+    fn valid_piece_selection(&self, m: &Move) -> Result<(), MoveError> {
+        if !self.board_state.is_piece(m.source) {
+            return Err(MoveError::NoPieceAtSource);
+        }
+        if !self.board_state.is_current_player_piece(m.source) {
+            return Err(MoveError::WrongPlayerPiece);
+        }
+        Ok(())
+    }
+
+    fn valid_destination(&self, m: &Move) -> Result<(), MoveError> {
+        let generator = MoveGenerator::new(self.board_state, self.board_state.active_player);
+        let mut destinations = generator.by_cell(m.source).map(|m| m.destination);
+
+        // TODO: If a destination is an attack, it needs to be verified that an opponent
+        //  piece is between the source and destination.
+        if destinations.all(|dest| dest != m.destination) {
+            return Err(MoveError::IllegalDestination);
+        }
+        if self.board_state.all_pieces() & m.destination != 0 {
+            return Err(MoveError::DestinationOccupied);
+        }
+        Ok(())
+    }
+}
+
+/// Iterator capable of generating all possible moves for a given [BoardState]
+/// and [Player] of that board.
+pub struct MoveIter<'a> {
+    player_pieces: CellIter,
+    generator: MoveGenerator<'a>,
+    validator: MoveValidator<'a>,
 }
 
 impl<'a> MoveIter<'a> {
-    /// Creates a new [MoveIter] instance from board reference and player type.
-    /// ```
-    /// use checke_rs::board::{Board, Player};
-    /// use checke_rs::position::MoveIter;
-    ///
-    /// let board = Board::default();
-    /// let moves = MoveIter::new(&board, Player::Black);
-    /// ```
-    pub fn new(board: &'a Board, player: Player) -> Self {
-        MoveIter { board, player, piece_index: 0 }
-    }
+    /// Creates a new [MoveIter] instance from given board reference and player.
+    pub fn new(board_state: &'a BoardState, player: Player) -> Self {
+        let player_pieces = board_state.pieces_by_player(player).used_cells();
+        let generator = MoveGenerator::new(board_state, player);
+        let validator = MoveValidator::new(board_state);
 
-    fn get_current_piece(&self) -> Option<MonoBitBoard> {
-        let player_bitboard = self.board.pieces_by_player(self.player);
-        let player_pieces = player_bitboard.pieces();
-        return player_pieces.get(self.piece_index as usize).cloned();
+        MoveIter { player_pieces, generator, validator }
     }
 }
 
@@ -336,22 +486,9 @@ impl<'a> Iterator for MoveIter<'a> {
     type Item = Move;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let current_piece = self.get_current_piece()?;
-        let position = Position::from(current_piece);
-
-        match position {
-            Position::Bottom => {}
-            Position::Left => {}
-            Position::BottomLeft => {}
-            Position::BottomRight => {}
-            Position::Top => {}
-            Position::Right => {}
-            Position::TopRight => {}
-            Position::TopLeft => {}
-            Position::Interior => {}
-        }
-
-        self.piece_index += 1;
-        Some(Move::new(Square::Two, Square::Nine).unwrap())
+        self.player_pieces
+            .by_ref()
+            .flat_map(|piece| self.generator.by_cell(piece))
+            .find(|m| self.validator.validate(m.clone()).is_ok())
     }
 }

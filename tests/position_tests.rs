@@ -1,97 +1,53 @@
-use checke_rs::bitboard::MonoBitBoard;
-use checke_rs::board::{Board, Player};
-use checke_rs::position::{MoveIter, Position};
-
-#[test]
-fn test_top_right_position_calculated_correctly() {
-    let value = 0b00000001_00000000_00000000_00000000_00000000_00000000_00000000_00000000;
-    let bitboard = MonoBitBoard::new(value).unwrap();
-    let position = Position::try_from(bitboard).unwrap();
-
-    assert_eq!(position, Position::TopRight)
-}
-
-mod parameterized_position_tests {
-    use test_case::test_case;
-
-    use checke_rs::bitboard::MonoBitBoard;
-    use checke_rs::position::Position;
-
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000000_00000010_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000000_00000100_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000000_00001000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000000_00010000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000000_00100000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000000_01000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000010_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000100_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00001000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00010000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00100000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_01000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000010_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000100_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00001000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00010000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00100000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_01000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000010_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00000100_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00001000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00010000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_00100000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000000_01000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000010_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00000100_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00001000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00010000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_00100000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000000_01000000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000010_00000000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00000100_00000000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00001000_00000000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00010000_00000000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_00100000_00000000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000000_01000000_00000000_00000000_00000000_00000000_00000000_00000000)]
-    fn test_interior_position_calculated_correctly(bb_value: u64) {
-        let bitboard = MonoBitBoard::new(bb_value).unwrap();
-        let position = Position::try_from(bitboard).unwrap();
-
-        assert_eq!(position, Position::Interior);
-    }
-
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000010)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000100)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00001000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00010000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00100000)]
-    #[test_case(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_01000000)]
-    fn test_bottom_position_calculated_correctly(bb_value: u64) {
-        let bitboard = MonoBitBoard::new(bb_value).unwrap();
-        let position = Position::try_from(bitboard).unwrap();
-
-        assert_eq!(position, Position::Bottom);
-    }
-
-    #[test_case(0b00000010_00000000_00000000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00000100_00000000_00000000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00001000_00000000_00000000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00010000_00000000_00000000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b00100000_00000000_00000000_00000000_00000000_00000000_00000000_00000000)]
-    #[test_case(0b01000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000)]
-    fn test_top_position_calculated_correctly(bb_value: u64) {
-        let bitboard = MonoBitBoard::new(bb_value).unwrap();
-        let position = Position::try_from(bitboard).unwrap();
-
-        assert_eq!(position, Position::Top);
-    }
-}
+use checke_rs::board::{BoardState, Player};
+use checke_rs::position::{MoveError, MoveIter, MoveValidator};
 
 #[test]
 fn test_no_moves_are_generated_from_empty_board() {
-    let board = Board::empty();
-    let moves = MoveIter::new(&board, Player::Red);
+    let board_state = BoardState::empty();
+    let moves = MoveIter::new(&board_state, Player::Red);
 
     assert_eq!(moves.count(), 0)
 }
 
+#[test]
+fn test_move_with_valid_source_and_destination_is_ok() {
+    let board_state = BoardState::default();
+    let validator = MoveValidator::new(&board_state);
+
+    let result = validator.validate("10x14");
+
+    assert!(result.is_ok())
+}
+
+#[test]
+fn test_move_with_valid_source_and_invalid_destination_is_error() {
+    let board_state = BoardState::default();
+    let validator = MoveValidator::new(&board_state);
+
+    let result = validator.validate("10x16");
+
+    let err = result.expect_err("Expected error when destination was not legal.");
+    assert_eq!(err, MoveError::IllegalDestination);
+}
+
+#[test]
+fn test_selecting_wrong_piece_is_error() {
+    let board_state = BoardState::default();
+    let validator = MoveValidator::new(&board_state);
+
+    let result = validator.validate("23x18");
+
+    let err = result.expect_err("Expected error when incorrect piece is selected.");
+    assert_eq!(err, MoveError::WrongPlayerPiece);
+}
+
+#[test]
+fn test_selecting_source_with_no_piece_is_error() {
+    let board_state = BoardState::default();
+    let validator = MoveValidator::new(&board_state);
+
+    let result = validator.validate("18x15");
+
+    let err = result.expect_err("Expected error when no piece was selected.");
+    assert_eq!(err, MoveError::NoPieceAtSource);
+}

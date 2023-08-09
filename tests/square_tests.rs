@@ -1,9 +1,47 @@
-use checke_rs::bitboard::{BitBoard, MonoBitBoard};
-use checke_rs::position::Square;
+use checke_rs::bitboard::MonoBitBoard;
+use checke_rs::position::{NotationError, Square};
+
+#[test]
+fn test_square_converts_from_valid_u8() {
+    let square = Square::try_from(1).unwrap();
+
+    assert_eq!(Square::One, square)
+}
+
+#[test]
+fn test_square_errors_from_invalid_u8() {
+    let result = Square::try_from(0);
+
+    let err = result.expect_err("Expected NotationError when u8 is out of range.");
+    assert_eq!(NotationError::OutOfRange, err)
+}
+
+#[test]
+fn test_square_converts_from_valid_string_slice() {
+    let square = Square::try_from("1").unwrap();
+
+    assert_eq!(Square::One, square)
+}
+
+#[test]
+fn test_to_number() {
+    let square = Square::One;
+
+    let number = square.to_number();
+
+    assert_eq!(number, 1)
+}
+
+#[test]
+fn test_square_iter() {
+    let square_count = Square::iter().count();
+
+    assert_eq!(square_count, 32)
+}
 
 #[test]
 fn test_square_one_produces_correct_bitboard() {
-    let bb = Square::One.to_bitboard();
+    let bb = MonoBitBoard::from(Square::One);
 
     let value = 0b01000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000;
     let expected_bb = MonoBitBoard::new(value).unwrap();
@@ -12,7 +50,7 @@ fn test_square_one_produces_correct_bitboard() {
 
 #[test]
 fn test_square_thirty_two_produces_correct_bitboard() {
-    let bb = Square::ThirtyTwo.to_bitboard();
+    let bb = MonoBitBoard::from(Square::ThirtyTwo);
 
     let value = 0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000010;
     let expected_bb = MonoBitBoard::new(value).unwrap();
@@ -21,6 +59,7 @@ fn test_square_thirty_two_produces_correct_bitboard() {
 
 mod move_tests {
     use test_case::test_case;
+
     use checke_rs::position::Move;
 
     #[test_case("9x12")]
