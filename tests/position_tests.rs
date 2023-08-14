@@ -1,5 +1,25 @@
+use checke_rs::bitboard::MonoBitBoard;
 use checke_rs::board::{BoardState, Player};
-use checke_rs::position::{MoveError, MoveIter, MoveValidator};
+use checke_rs::position::{Move, MoveError, MoveIter, MoveValidator, Square};
+
+#[test]
+fn test_capturing_move_creates_capture() {
+    let m = Move::from_notation("1x10").unwrap();
+
+    let capture = m.capture();
+
+    let piece = capture.expect("Expected capture piece to exist.");
+    assert_eq!(piece, MonoBitBoard::from(Square::Six));
+}
+
+#[test]
+fn test_non_capturing_move_does_not_create_capture() {
+    let m = Move::from_notation("1x6").unwrap();
+
+    let capture = m.capture();
+
+    assert!(capture.is_none())
+}
 
 #[test]
 fn test_no_moves_are_generated_from_empty_board() {

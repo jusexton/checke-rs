@@ -155,6 +155,7 @@ impl TryFrom<MonoBitBoard> for Square {
 pub struct Move {
     source: MonoBitBoard,
     destination: MonoBitBoard,
+    capture: Option<MonoBitBoard>,
 }
 
 impl Move {
@@ -162,7 +163,28 @@ impl Move {
     /// Move instances have no context of a board or any checkers rules. Moves are simply
     /// a source and destination. Move validation is expected to be done via other mechanisms.
     pub fn new(source: MonoBitBoard, destination: MonoBitBoard) -> Self {
-        Move { source, destination }
+        let capture = Move::get_capture(source, destination);
+        Move { source, destination, capture }
+    }
+
+    fn get_capture(source: MonoBitBoard, destination: MonoBitBoard) -> Option<MonoBitBoard> {
+        let mut distance = 0;
+        let (mut source, destination) =
+            if source > destination { (source, destination) } else { (destination, source) };
+
+        while source != destination {
+            source >>= 1;
+            distance += 1;
+        }
+
+        let is_capture_move = distance > 9;
+        match is_capture_move {
+            true => {
+                source <<= distance / 2;
+                Some(source)
+            }
+            false => None
+        }
     }
 
     /// Creates a new [Move] instance from two given squares. Move instances have no context of
@@ -171,7 +193,7 @@ impl Move {
     pub fn from_squares(source: Square, destination: Square) -> Self {
         let source = MonoBitBoard::from(source);
         let destination = MonoBitBoard::from(destination);
-        Move { source, destination }
+        Move::new(source, destination)
     }
 
     /// Create a new [Move] instance using the given checkers notation text.
@@ -206,9 +228,12 @@ impl Move {
         self.destination
     }
 
+    /// Retrieves a [MonoBitBoard] representing the piece this move captures.
+    pub fn capture(&self) -> Option<MonoBitBoard> { self.capture }
+
     /// Returns a bitboard representing the squares that will change if the move is applied.
     /// This value will be useful when updating a bitboard with a move by applying an xor.
-    pub fn to_bitboard(&self) -> BitBoard { self.source | self.destination }
+    pub fn mask(&self) -> BitBoard { self.source | self.destination }
 }
 
 impl TryFrom<&str> for Move {
@@ -234,10 +259,10 @@ impl TryFrom<(Square, Square)> for Move {
 
     /// Converts a tuple of [Square] into a [Move] instance.
     fn try_from(value: (Square, Square)) -> Result<Self, Self::Error> {
-        let m = Self {
-            source: MonoBitBoard::from(value.0),
-            destination: MonoBitBoard::from(value.1),
-        };
+        let m = Move::new(
+            MonoBitBoard::from(value.0),
+            MonoBitBoard::from(value.1),
+        );
         Ok(m)
     }
 }
@@ -313,38 +338,38 @@ const BLACK_PIECE_MOVES: &[BitBoard; 32] = &[
 ];
 
 const KING_MOVES: &[BitBoard; 32] = &[
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000)
+    BitBoard::new(0b00000000_10100000_00010000_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00101000_01000100_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00001010_00010001_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00000010_00000100_00000000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b01000000_00000000_01000000_00100000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b01010000_00000000_01010000_10001000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00010100_00000000_00010100_00100010_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00000101_00000000_00000101_00001000_00000000_00000000_00000000_00000000),
+    BitBoard::new(0b00010000_10100000_00000000_10100000_00010000_00000000_00000000_00000000),
+    BitBoard::new(0b01000100_00101000_00000000_00101000_01000100_00000000_00000000_00000000),
+    BitBoard::new(0b00010001_00001010_00000000_00001010_00010001_00000000_00000000_00000000),
+    BitBoard::new(0b00000100_00000010_00000000_00000010_00000100_00000000_00000000_00000000),
+    BitBoard::new(0b00000000_00100000_01000000_00000000_01000000_00100000_00000000_00000000),
+    BitBoard::new(0b00000000_10001000_01010000_00000000_01010000_10001000_00000000_00000000),
+    BitBoard::new(0b00000000_00100010_00010100_00000000_00010100_00100010_00000000_00000000),
+    BitBoard::new(0b00000000_00001000_00000101_00000000_00000101_00001000_00000000_00000000),
+    BitBoard::new(0b00000000_00000000_00010000_10100000_00000000_10100000_00010000_00000000),
+    BitBoard::new(0b00000000_00000000_01000100_00101000_00000000_00101000_01000100_00000000),
+    BitBoard::new(0b00000000_00000000_00010001_00001010_00000000_00001010_00010001_00000000),
+    BitBoard::new(0b00000000_00000000_00000100_00000010_00000000_00000010_00000100_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00100000_01000000_00000000_01000000_00100000),
+    BitBoard::new(0b00000000_00000000_00000000_10001000_01010000_00000000_01010000_10001000),
+    BitBoard::new(0b00000000_00000000_00000000_00100010_00010100_00000000_00010100_00100010),
+    BitBoard::new(0b00000000_00000000_00000000_00001000_00000101_00000000_00000101_00001000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00010000_10100000_00000000_10100000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_01000100_00101000_00000000_00101000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00010001_00001010_00000000_00001010),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000100_00000010_00000000_00000010),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00100000_01000000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_10001000_01010000_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00100010_00010100_00000000),
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00001000_00000101_00000000)
 ];
 
 /// Capable of generating all possible moves. The key different between [MoveGenerator]
@@ -414,6 +439,9 @@ pub enum MoveError {
 
     #[error("The destination was already occupied by a player piece.")]
     DestinationOccupied,
+
+    #[error("A capture move must jump a square containing an enemy piece.")]
+    InvalidCapture,
 }
 
 /// Capable of validating that a given move is valid provided additional [BoardState] context.
@@ -448,17 +476,21 @@ impl<'a> MoveValidator<'a> {
     }
 
     fn valid_destination(&self, m: &Move) -> Result<(), MoveError> {
-        let generator = MoveGenerator::new(self.board_state, self.board_state.active_player);
+        let generator = MoveGenerator::new(self.board_state, self.board_state.current_player);
         let mut destinations = generator.by_cell(m.source).map(|m| m.destination);
 
-        // TODO: If a destination is an attack, it needs to be verified that an opponent
-        //  piece is between the source and destination.
         if destinations.all(|dest| dest != m.destination) {
             return Err(MoveError::IllegalDestination);
         }
         if self.board_state.all_pieces() & m.destination != 0 {
             return Err(MoveError::DestinationOccupied);
         }
+        if let Some(piece) = m.capture() {
+            if !self.board_state.is_other_player_piece(piece) {
+                return Err(MoveError::InvalidCapture);
+            }
+        }
+
         Ok(())
     }
 }

@@ -3,12 +3,14 @@ use std::collections::VecDeque;
 use thiserror::Error;
 
 use crate::bitboard::{BitBoard, MonoBitBoard};
-use crate::position::{MoveError, MoveIter, MoveValidator, Square};
+use crate::position::{Move, MoveError, MoveIter, MoveValidator, Square};
 use crate::turn::Turn;
 
 pub const INITIAL_RED_PIECES: BitBoard = BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_10101010_01010101_10101010);
 pub const INITIAL_BLACK_PIECES: BitBoard = BitBoard::new(0b01010101_10101010_01010101_00000000_00000000_00000000_00000000_00000000);
 pub const INITIAL_KINGS: BitBoard = BitBoard::new(0);
+
+pub const KING_SQUARES: BitBoard = BitBoard::new(0b01010101_00000000_00000000_00000000_00000000_00000000_00000000_10101010);
 
 /// Represents the current status of a board instance.
 #[derive(Debug, PartialEq)]
@@ -32,7 +34,7 @@ pub enum Player {
 /// Represents the state a classical checkers board may be in.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BoardState {
-    pub active_player: Player,
+    pub current_player: Player,
     pub red_pieces: BitBoard,
     pub black_pieces: BitBoard,
     pub kings: BitBoard,
@@ -41,7 +43,7 @@ pub struct BoardState {
 impl Default for BoardState {
     fn default() -> Self {
         Self {
-            active_player: Player::Black,
+            current_player: Player::Black,
             red_pieces: INITIAL_RED_PIECES,
             black_pieces: INITIAL_BLACK_PIECES,
             kings: INITIAL_KINGS,
@@ -53,7 +55,7 @@ impl BoardState {
     /// Creates an empty [BoardState] instance.
     pub fn empty() -> Self {
         Self {
-            active_player: Player::Black,
+            current_player: Player::Black,
             red_pieces: BitBoard::new(0),
             black_pieces: BitBoard::new(0),
             kings: BitBoard::new(0),
@@ -79,11 +81,11 @@ impl BoardState {
     }
 
     /// Retrieves the player that is able to take a turn on this board instance.
-    pub fn active_player(&self) -> Player { self.active_player }
+    pub fn current_player(&self) -> Player { self.current_player }
 
     /// Determines the next player that will be active once a turn is successfully completed.
     pub fn next_player(&self) -> Player {
-        match self.active_player {
+        match self.current_player {
             Player::Red => Player::Black,
             Player::Black => Player::Red
         }
@@ -91,13 +93,19 @@ impl BoardState {
 
     /// Retrieves a bitboard representing where all pieces of the current player are on the board.
     pub fn current_player_pieces(&self) -> BitBoard {
-        self.pieces_by_player(self.active_player())
+        self.pieces_by_player(self.current_player())
     }
 
     /// Returns true if there is a piece occupying the given square and it belongs to the current
     /// player. Otherwise, returns false.
     pub fn is_current_player_piece(&self, bitboard: MonoBitBoard) -> bool {
         self.current_player_pieces() & bitboard != 0
+    }
+
+    /// Returns true if there is a piece occupying the given square and it belongs to the player
+    /// not currently active. Otherwise, returns false.
+    pub fn is_other_player_piece(&self, bitboard: MonoBitBoard) -> bool {
+        !self.is_current_player_piece(bitboard)
     }
 
     /// Returns true if there is a piece occupying the given square. Otherwise, returns false.
@@ -145,6 +153,10 @@ impl BoardState {
     pub fn is_king(&self, bitboard: MonoBitBoard) -> bool {
         self.all_kings() & bitboard != 0
     }
+
+    pub fn is_king_row(&self, bitboard: MonoBitBoard) -> bool {
+        KING_SQUARES & bitboard != 0
+    }
 }
 
 /// A board value is used to track and moderate the progress of a checkers game.
@@ -172,6 +184,15 @@ impl Board {
         Board::new(initial_state)
     }
 
+    /// Returns the board's initial state
+    pub fn initial_state(&self) -> &BoardState {
+        match self.state_stack.front() {
+            Some(state) => state,
+            // Unreachable due to the board always having at least a single state
+            None => unreachable!()
+        }
+    }
+
     /// Returns the current board state
     pub fn current_state(&self) -> &BoardState {
         match self.state_stack.back() {
@@ -181,11 +202,11 @@ impl Board {
         }
     }
 
-    /// Calculates the current status of the game based on if the boards currently active player
+    /// Calculates the current status of the game based on if the boards current player
     /// has any available moves to make.
     pub fn status(&self) -> BoardStatus {
         let current_state = self.current_state();
-        let mut player_moves = MoveIter::new(current_state, current_state.active_player);
+        let mut player_moves = MoveIter::new(current_state, current_state.current_player);
         match player_moves.next() {
             Some(_) => BoardStatus::OnGoing,
             None => BoardStatus::Complete { winner: current_state.next_player() }
@@ -214,19 +235,40 @@ impl Board {
             let validator = MoveValidator::new(&board_state);
             validator.validate(m.clone())?;
 
-            match board_state.active_player {
-                Player::Red => {
-                    board_state.red_pieces ^= m.to_bitboard()
+            Board::apply_move(&mut board_state, m)
+        }
+
+        board_state.current_player = board_state.next_player();
+        self.state_stack.push_back(board_state);
+        Ok(self.current_state())
+    }
+
+    // Method used to mutate a board state value with move details
+    fn apply_move(board_state: &mut BoardState, m: &Move) {
+        let move_mask = m.mask();
+
+        if board_state.is_king(m.source()) {
+            board_state.kings ^= move_mask;
+        }
+
+        match board_state.current_player {
+            Player::Red => {
+                board_state.red_pieces ^= move_mask;
+                if let Some(capture) = m.capture() {
+                    board_state.black_pieces ^= capture;
                 }
-                Player::Black => {
-                    board_state.black_pieces ^= m.to_bitboard();
+            }
+            Player::Black => {
+                board_state.black_pieces ^= move_mask;
+                if let Some(capture) = m.capture() {
+                    board_state.red_pieces ^= capture;
                 }
             }
         }
 
-        board_state.active_player = board_state.next_player();
-        self.state_stack.push_back(board_state);
-        Ok(self.current_state())
+        if board_state.is_king_row(m.destination()) {
+            board_state.kings ^= m.destination()
+        }
     }
 
     /// Removes the last turn and returns the state of the board, or None if only the
@@ -306,20 +348,13 @@ impl BoardBuilder {
                 Player::Black => { black_pieces = black_pieces | piece }
             }
 
-            // TODO: If piece is placed where it should be kinged, it will remain a normal piece.
-            //  Builder should be smart enough to automatically update these pieces to kings.
             if placement.is_king {
                 kings = kings | piece
             }
         }
 
         let current_player = self.current_player;
-        let initial_state = BoardState {
-            active_player: current_player,
-            red_pieces,
-            black_pieces,
-            kings,
-        };
+        let initial_state = BoardState { current_player, red_pieces, black_pieces, kings };
         let board = Board::new(initial_state);
         Ok(board)
     }

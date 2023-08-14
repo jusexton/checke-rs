@@ -1,5 +1,5 @@
 use checke_rs::bitboard::BitBoard;
-use checke_rs::board::{Board, BoardBuilder, BoardCreationError, BoardStatus, INITIAL_KINGS, INITIAL_RED_PIECES, Player};
+use checke_rs::board::{Board, BoardBuilder, BoardCreationError, BoardState, BoardStatus, INITIAL_KINGS, INITIAL_RED_PIECES, Player};
 use checke_rs::position::{MoveError, Square};
 
 #[test]
@@ -7,7 +7,7 @@ use checke_rs::position::{MoveError, Square};
 fn test_board_initialization() {
     let board = Board::default();
 
-    assert_eq!(board.current_state().active_player, Player::Black);
+    assert_eq!(board.current_state().current_player, Player::Black);
     assert_eq!(board.status(), BoardStatus::OnGoing);
 }
 
@@ -17,7 +17,7 @@ fn test_push_turn_with_single_move() {
 
     let board_state = board.push_turn("11x15").unwrap();
 
-    assert_eq!(board_state.active_player, Player::Red);
+    assert_eq!(board_state.current_player, Player::Red);
     assert_eq!(board_state.red_pieces, INITIAL_RED_PIECES);
     assert_eq!(board_state.black_pieces, BitBoard::new(0b01010101_10101010_01010001_00001000_00000000_00000000_00000000_00000000));
     assert_eq!(board_state.kings, INITIAL_KINGS);
@@ -28,16 +28,44 @@ fn test_push_turn_with_many_moves() {
     let mut board = Board::default();
 
     let board_state = board.push_turn("11x16").unwrap();
-    assert_eq!(board_state.active_player, Player::Red);
+    assert_eq!(board_state.current_player, Player::Red);
     assert_eq!(board_state.red_pieces, INITIAL_RED_PIECES);
     assert_eq!(board_state.black_pieces, BitBoard::new(0b01010101_10101010_01010001_00000010_00000000_00000000_00000000_00000000));
     assert_eq!(board_state.kings, INITIAL_KINGS);
 
     let board_state = board.push_turn("24x19").unwrap();
-    assert_eq!(board_state.active_player, Player::Black);
+    assert_eq!(board_state.current_player, Player::Black);
     assert_eq!(board_state.red_pieces, BitBoard::new(0b00000000_00000000_00000000_00000000_00000100_10101000_01010101_10101010));
     assert_eq!(board_state.black_pieces, BitBoard::new(0b01010101_10101010_01010001_00000010_00000000_00000000_00000000_00000000));
     assert_eq!(board_state.kings, INITIAL_KINGS);
+}
+
+#[test]
+fn test_pop_turn() {
+    let mut board = Board::default();
+
+    let board_state = board.push_turn("11x16").unwrap();
+    assert_eq!(board_state.current_player, Player::Red);
+    assert_eq!(board_state.red_pieces, INITIAL_RED_PIECES);
+    assert_eq!(board_state.black_pieces, BitBoard::new(0b01010101_10101010_01010001_00000010_00000000_00000000_00000000_00000000));
+    assert_eq!(board_state.kings, INITIAL_KINGS);
+
+    let board_state = board.pop_turn().unwrap();
+    assert_eq!(board_state.current_player, Player::Red);
+    assert_eq!(board_state.red_pieces, INITIAL_RED_PIECES);
+    assert_eq!(board_state.black_pieces, BitBoard::new(0b01010101_10101010_01010001_00000010_00000000_00000000_00000000_00000000));
+    assert_eq!(board_state.kings, INITIAL_KINGS);
+
+    assert_eq!(board.current_state(), &BoardState::default())
+}
+
+#[test]
+fn test_pop_turn_returns_none_when_no_turns_left_to_pop() {
+    let mut board = Board::default();
+
+    let board_state = board.pop_turn();
+
+    assert!(board_state.is_none())
 }
 
 #[test]
@@ -73,12 +101,15 @@ fn test_push_turn_with_no_player_piece_error() {
 #[test]
 fn test_simple_board_creation() {
     let board = BoardBuilder::default()
+        .current_player(Player::Red)
         .piece(Player::Red, Square::Six)
         .piece(Player::Black, Square::Eighteen)
         .king(Player::Black, Square::Eight)
         .build().unwrap();
 
     let current_state = board.current_state();
+    assert_eq!(current_state.current_player, Player::Red);
+
     let expected_black_pieces = BitBoard::new(0b00000000_00000010_00000000_00000000_00010000_00000000_00000000_00000000);
     assert_eq!(current_state.black_pieces(), expected_black_pieces);
 

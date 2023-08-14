@@ -4,8 +4,7 @@
 #[macro_use]
 extern crate num_derive;
 
-pub mod board;
 pub mod bitboard;
 pub mod turn;
 pub mod position;
-
+pub mod board;

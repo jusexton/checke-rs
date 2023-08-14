@@ -1,4 +1,4 @@
-use std::ops::{BitAnd, BitOr, BitXor, BitXorAssign, Range};
+use std::ops::{BitAnd, BitOr, BitXor, BitXorAssign, Range, ShlAssign, ShrAssign};
 
 use thiserror::Error;
 
@@ -30,10 +30,8 @@ pub const BOTTOM_SQUARES: BitBoard = BitBoard(0x00000000000000FF);
 pub const TOP_AND_BOTTOM_SQUARES: BitBoard = BitBoard(0xFF000000000000FF);
 
 /// Bit representation of a checkers board. Backed by 64 bits; a bitboard uses bits to represent
-/// each square on the board. Multiple bitboards are generally used to track different information.
-/// These boards can then make use of bit operations to quickly determine the full context of the
-/// board. This bitboard implementation not only exposes various bit operations but other domain
-/// specific helpers closely related to bitboard calculation that make board
+/// each square on the board. This bitboard implementation not only exposes various bit operations
+/// but other domain specific helpers closely related to bitboard calculation that make board
 /// calculations easy and fast.
 #[derive(Copy, Clone, Debug)]
 pub struct BitBoard(u64);
@@ -58,7 +56,7 @@ impl BitBoard {
     /// Calculates whether the given [MonoBitBoard] overlaps with this bitboard instance.
     /// A bitboard overlaps with another when they have at least one bit in common.
     pub fn contains(&self, bitboard: MonoBitBoard) -> bool {
-        !(*self & bitboard).empty()
+        *self & bitboard != 0
     }
 }
 
@@ -108,13 +106,19 @@ impl BitXorAssign for BitBoard {
     }
 }
 
+impl BitXorAssign<MonoBitBoard> for BitBoard {
+    fn bitxor_assign(&mut self, rhs: MonoBitBoard) {
+        self.0 ^= rhs.0
+    }
+}
+
 #[derive(Debug, Error)]
 #[error("MonoBitBoard can only be constructed with a value that contains a single bit with the value of 1.")]
 pub struct MonoBitBoardError;
 
 /// Special type of bitboard that enforces that only a single bit has the value of 1.
 /// This can be useful when representing a piece or single cell using bitboard and type safety.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialOrd)]
 pub struct MonoBitBoard(u64);
 
 impl MonoBitBoard {
@@ -141,6 +145,18 @@ impl BitOr for MonoBitBoard {
 
     fn bitor(self, rhs: Self) -> Self::Output {
         BitBoard(self.0 | rhs.0)
+    }
+}
+
+impl ShlAssign<u8> for MonoBitBoard {
+    fn shl_assign(&mut self, rhs: u8) {
+        self.0 <<= rhs
+    }
+}
+
+impl ShrAssign<u8> for MonoBitBoard {
+    fn shr_assign(&mut self, rhs: u8) {
+        self.0 >>= rhs
     }
 }
 
