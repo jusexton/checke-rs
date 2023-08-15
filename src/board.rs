@@ -162,7 +162,7 @@ impl BoardState {
 /// A board value is used to track and moderate the progress of a checkers game.
 #[derive(Debug)]
 pub struct Board {
-    state_stack: VecDeque<BoardState>,
+    history: VecDeque<BoardState>,
 }
 
 impl Default for Board {
@@ -175,7 +175,7 @@ impl Default for Board {
 
 impl Board {
     pub(crate) fn new(initial_state: BoardState) -> Self {
-        Board { state_stack: VecDeque::from([initial_state]) }
+        Board { history: VecDeque::from([initial_state]) }
     }
 
     /// Creates an empty [Board] instance.
@@ -186,7 +186,7 @@ impl Board {
 
     /// Returns the board's initial state
     pub fn initial_state(&self) -> &BoardState {
-        match self.state_stack.front() {
+        match self.history.front() {
             Some(state) => state,
             // Unreachable due to the board always having at least a single state
             None => unreachable!()
@@ -195,7 +195,7 @@ impl Board {
 
     /// Returns the current board state
     pub fn current_state(&self) -> &BoardState {
-        match self.state_stack.back() {
+        match self.history.back() {
             Some(state) => state,
             // Unreachable due to the board always having at least a single state
             None => unreachable!()
@@ -239,7 +239,7 @@ impl Board {
         }
 
         board_state.current_player = board_state.next_player();
-        self.state_stack.push_back(board_state);
+        self.history.push_back(board_state);
         Ok(self.current_state())
     }
 
@@ -274,17 +274,17 @@ impl Board {
     /// Removes the last turn and returns the state of the board, or None if only the
     /// initial state remains on the stack.
     pub fn pop_turn(&mut self) -> Option<BoardState> {
-        match self.state_stack.len() {
+        match self.history.len() {
             // There should always be at least one state item on the stack.
             1 => None,
-            _ => self.state_stack.pop_back()
+            _ => self.history.pop_back()
         }
     }
 
     /// Returns a reference to the boards state stack. Useful for viewing the history of
     /// the board.
     pub fn state_stack(&self) -> &VecDeque<BoardState> {
-        &self.state_stack
+        &self.history
     }
 }
 
