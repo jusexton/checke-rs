@@ -1,5 +1,8 @@
 use checke_rs::bitboard::BitBoard;
-use checke_rs::board::{Board, BoardBuilder, BoardCreationError, BoardState, BoardStatus, INITIAL_KINGS, INITIAL_RED_PIECES, Player};
+use checke_rs::board::{
+    Board, BoardBuilder, BoardCreationError, BoardState, BoardStatus, Player, INITIAL_KINGS,
+    INITIAL_RED_PIECES,
+};
 use checke_rs::position::{MoveError, Square};
 
 #[test]
@@ -19,7 +22,10 @@ fn test_push_turn_with_single_move() {
 
     assert_eq!(board_state.current_player, Player::Red);
     assert_eq!(board_state.red_pieces, INITIAL_RED_PIECES);
-    assert_eq!(board_state.black_pieces, BitBoard::new(0b01010101_10101010_01010001_00001000_00000000_00000000_00000000_00000000));
+    assert_eq!(
+        board_state.black_pieces,
+        BitBoard::new(0b01010101_10101010_01010001_00001000_00000000_00000000_00000000_00000000)
+    );
     assert_eq!(board_state.kings, INITIAL_KINGS);
 }
 
@@ -30,13 +36,22 @@ fn test_push_turn_with_many_moves() {
     let board_state = board.push_turn("11x16").unwrap();
     assert_eq!(board_state.current_player, Player::Red);
     assert_eq!(board_state.red_pieces, INITIAL_RED_PIECES);
-    assert_eq!(board_state.black_pieces, BitBoard::new(0b01010101_10101010_01010001_00000010_00000000_00000000_00000000_00000000));
+    assert_eq!(
+        board_state.black_pieces,
+        BitBoard::new(0b01010101_10101010_01010001_00000010_00000000_00000000_00000000_00000000)
+    );
     assert_eq!(board_state.kings, INITIAL_KINGS);
 
     let board_state = board.push_turn("24x19").unwrap();
     assert_eq!(board_state.current_player, Player::Black);
-    assert_eq!(board_state.red_pieces, BitBoard::new(0b00000000_00000000_00000000_00000000_00000100_10101000_01010101_10101010));
-    assert_eq!(board_state.black_pieces, BitBoard::new(0b01010101_10101010_01010001_00000010_00000000_00000000_00000000_00000000));
+    assert_eq!(
+        board_state.red_pieces,
+        BitBoard::new(0b00000000_00000000_00000000_00000000_00000100_10101000_01010101_10101010)
+    );
+    assert_eq!(
+        board_state.black_pieces,
+        BitBoard::new(0b01010101_10101010_01010001_00000010_00000000_00000000_00000000_00000000)
+    );
     assert_eq!(board_state.kings, INITIAL_KINGS);
 }
 
@@ -47,13 +62,19 @@ fn test_pop_turn() {
     let board_state = board.push_turn("11x16").unwrap();
     assert_eq!(board_state.current_player, Player::Red);
     assert_eq!(board_state.red_pieces, INITIAL_RED_PIECES);
-    assert_eq!(board_state.black_pieces, BitBoard::new(0b01010101_10101010_01010001_00000010_00000000_00000000_00000000_00000000));
+    assert_eq!(
+        board_state.black_pieces,
+        BitBoard::new(0b01010101_10101010_01010001_00000010_00000000_00000000_00000000_00000000)
+    );
     assert_eq!(board_state.kings, INITIAL_KINGS);
 
     let board_state = board.pop_turn().unwrap();
     assert_eq!(board_state.current_player, Player::Red);
     assert_eq!(board_state.red_pieces, INITIAL_RED_PIECES);
-    assert_eq!(board_state.black_pieces, BitBoard::new(0b01010101_10101010_01010001_00000010_00000000_00000000_00000000_00000000));
+    assert_eq!(
+        board_state.black_pieces,
+        BitBoard::new(0b01010101_10101010_01010001_00000010_00000000_00000000_00000000_00000000)
+    );
     assert_eq!(board_state.kings, INITIAL_KINGS);
 
     assert_eq!(board.current_state(), &BoardState::default())
@@ -74,7 +95,8 @@ fn test_push_turn_with_destination_occupied_error() {
 
     let result = board.push_turn("1x6");
 
-    let error = result.expect_err("Expected error to occur when moving a piece to an already occupied square.");
+    let error = result
+        .expect_err("Expected error to occur when moving a piece to an already occupied square.");
     assert_eq!(error, MoveError::DestinationOccupied)
 }
 
@@ -94,7 +116,9 @@ fn test_push_turn_with_no_player_piece_error() {
 
     let result = board.push_turn("18x15");
 
-    let error = result.expect_err("Expected error to occur when selecting a square that does not contain a piece.");
+    let error = result.expect_err(
+        "Expected error to occur when selecting a square that does not contain a piece.",
+    );
     assert_eq!(error, MoveError::NoPieceAtSource)
 }
 
@@ -105,18 +129,22 @@ fn test_simple_board_creation() {
         .piece(Player::Red, Square::Six)
         .piece(Player::Black, Square::Eighteen)
         .king(Player::Black, Square::Eight)
-        .build().unwrap();
+        .build()
+        .unwrap();
 
     let current_state = board.current_state();
     assert_eq!(current_state.current_player, Player::Red);
 
-    let expected_black_pieces = BitBoard::new(0b00000000_00000010_00000000_00000000_00010000_00000000_00000000_00000000);
+    let expected_black_pieces =
+        BitBoard::new(0b00000000_00000010_00000000_00000000_00010000_00000000_00000000_00000000);
     assert_eq!(current_state.black_pieces(), expected_black_pieces);
 
-    let expected_red_pieces = BitBoard::new(0b00000000_00100000_00000000_00000000_00000000_00000000_00000000_00000000);
+    let expected_red_pieces =
+        BitBoard::new(0b00000000_00100000_00000000_00000000_00000000_00000000_00000000_00000000);
     assert_eq!(current_state.red_pieces(), expected_red_pieces);
 
-    let expected_kings = BitBoard::new(0b00000000_00000010_00000000_00000000_00000000_00000000_00000000_00000000);
+    let expected_kings =
+        BitBoard::new(0b00000000_00000010_00000000_00000000_00000000_00000000_00000000_00000000);
     assert_eq!(current_state.all_kings(), expected_kings);
 }
 
@@ -127,5 +155,8 @@ fn test_board_builder_returns_error_when_multiple_placements_on_same_square() {
         .piece(Player::Black, Square::Six)
         .build();
 
-    assert_eq!(build_result.unwrap_err(), BoardCreationError::DuplicateAssignments);
+    assert_eq!(
+        build_result.unwrap_err(),
+        BoardCreationError::DuplicateAssignments
+    );
 }

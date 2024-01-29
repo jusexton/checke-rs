@@ -6,11 +6,14 @@ use crate::bitboard::{BitBoard, MonoBitBoard};
 use crate::position::{Move, MoveError, MoveIter, MoveValidator, Square};
 use crate::turn::Turn;
 
-pub const INITIAL_RED_PIECES: BitBoard = BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_10101010_01010101_10101010);
-pub const INITIAL_BLACK_PIECES: BitBoard = BitBoard::new(0b01010101_10101010_01010101_00000000_00000000_00000000_00000000_00000000);
+pub const INITIAL_RED_PIECES: BitBoard =
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_10101010_01010101_10101010);
+pub const INITIAL_BLACK_PIECES: BitBoard =
+    BitBoard::new(0b01010101_10101010_01010101_00000000_00000000_00000000_00000000_00000000);
 pub const INITIAL_KINGS: BitBoard = BitBoard::new(0);
 
-pub const KING_SQUARES: BitBoard = BitBoard::new(0b01010101_00000000_00000000_00000000_00000000_00000000_00000000_10101010);
+pub const KING_SQUARES: BitBoard =
+    BitBoard::new(0b01010101_00000000_00000000_00000000_00000000_00000000_00000000_10101010);
 
 /// Represents the current status of a board instance.
 #[derive(Debug, PartialEq)]
@@ -76,18 +79,20 @@ impl BoardState {
     pub fn pieces_by_player(&self, player: Player) -> BitBoard {
         match player {
             Player::Red => self.red_pieces(),
-            Player::Black => self.black_pieces()
+            Player::Black => self.black_pieces(),
         }
     }
 
     /// Retrieves the player that is able to take a turn on this board instance.
-    pub fn current_player(&self) -> Player { self.current_player }
+    pub fn current_player(&self) -> Player {
+        self.current_player
+    }
 
     /// Determines the next player that will be active once a turn is successfully completed.
     pub fn next_player(&self) -> Player {
         match self.current_player {
             Player::Red => Player::Black,
-            Player::Black => Player::Red
+            Player::Black => Player::Red,
         }
     }
 
@@ -142,12 +147,14 @@ impl BoardState {
     pub fn kings_by_player(&self, player: Player) -> BitBoard {
         match player {
             Player::Red => self.red_kings(),
-            Player::Black => self.black_kings()
+            Player::Black => self.black_kings(),
         }
     }
 
     /// Retrieves a bitboard representing all king pieces are on the board.
-    pub fn all_kings(&self) -> BitBoard { self.kings }
+    pub fn all_kings(&self) -> BitBoard {
+        self.kings
+    }
 
     /// Returns true if there is a king occupying the given square. Otherwise, returns false.
     pub fn is_king(&self, bitboard: MonoBitBoard) -> bool {
@@ -175,7 +182,9 @@ impl Default for Board {
 
 impl Board {
     pub(crate) fn new(initial_state: BoardState) -> Self {
-        Board { history: VecDeque::from([initial_state]) }
+        Board {
+            history: VecDeque::from([initial_state]),
+        }
     }
 
     /// Creates an empty [Board] instance.
@@ -189,7 +198,7 @@ impl Board {
         match self.history.front() {
             Some(state) => state,
             // Unreachable due to the board always having at least a single state
-            None => unreachable!()
+            None => unreachable!(),
         }
     }
 
@@ -198,7 +207,7 @@ impl Board {
         match self.history.back() {
             Some(state) => state,
             // Unreachable due to the board always having at least a single state
-            None => unreachable!()
+            None => unreachable!(),
         }
     }
 
@@ -209,7 +218,9 @@ impl Board {
         let mut player_moves = MoveIter::new(current_state, current_state.current_player);
         match player_moves.next() {
             Some(_) => BoardStatus::OnGoing,
-            None => BoardStatus::Complete { winner: current_state.next_player() }
+            None => BoardStatus::Complete {
+                winner: current_state.next_player(),
+            },
         }
     }
 
@@ -218,18 +229,23 @@ impl Board {
     pub fn is_game_concluded(&self) -> bool {
         match self.status() {
             BoardStatus::Complete { .. } => true,
-            BoardStatus::OnGoing => false
+            BoardStatus::OnGoing => false,
         }
     }
 
     /// Attempts to apply a turn to the game board, changing the state of the board if a valid
     /// turn is provided.
-    pub fn push_turn<T>(&mut self, turn: T) -> Result<&BoardState, MoveError> where T: TryInto<Turn> {
+    pub fn push_turn<T>(&mut self, turn: T) -> Result<&BoardState, MoveError>
+    where
+        T: TryInto<Turn>,
+    {
         if self.is_game_concluded() {
             return Err(MoveError::GameConcluded);
         }
 
-        let turn = turn.try_into().map_err(|_| MoveError::InvalidConstruction)?;
+        let turn = turn
+            .try_into()
+            .map_err(|_| MoveError::InvalidConstruction)?;
         let mut board_state = self.current_state().clone();
         for m in turn.moves() {
             let validator = MoveValidator::new(&board_state);
@@ -277,7 +293,7 @@ impl Board {
         match self.history.len() {
             // There should always be at least one state item on the stack.
             1 => None,
-            _ => self.history.pop_back()
+            _ => self.history.pop_back(),
         }
     }
 
@@ -291,7 +307,7 @@ impl Board {
 #[derive(Debug, Error, PartialEq)]
 pub enum BoardCreationError {
     #[error("Only a single piece can be placed per square.")]
-    DuplicateAssignments
+    DuplicateAssignments,
 }
 
 #[derive(Debug)]
@@ -317,14 +333,22 @@ impl BoardBuilder {
 
     /// Adds a normal piece on the board.
     pub fn piece(&mut self, player: Player, square: Square) -> &mut Self {
-        let placement = Placement { player, square, is_king: false };
+        let placement = Placement {
+            player,
+            square,
+            is_king: false,
+        };
         self.placements.push(placement);
         self
     }
 
     /// Adds a king piece on the board.
     pub fn king(&mut self, player: Player, square: Square) -> &mut Self {
-        let placement = Placement { player, square, is_king: true };
+        let placement = Placement {
+            player,
+            square,
+            is_king: true,
+        };
         self.placements.push(placement);
         self
     }
@@ -344,8 +368,8 @@ impl BoardBuilder {
             }
 
             match placement.player {
-                Player::Red => { red_pieces = red_pieces | piece }
-                Player::Black => { black_pieces = black_pieces | piece }
+                Player::Red => red_pieces = red_pieces | piece,
+                Player::Black => black_pieces = black_pieces | piece,
             }
 
             if placement.is_king {
@@ -354,7 +378,12 @@ impl BoardBuilder {
         }
 
         let current_player = self.current_player;
-        let initial_state = BoardState { current_player, red_pieces, black_pieces, kings };
+        let initial_state = BoardState {
+            current_player,
+            red_pieces,
+            black_pieces,
+            kings,
+        };
         let board = Board::new(initial_state);
         Ok(board)
     }

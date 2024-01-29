@@ -127,7 +127,7 @@ impl MonoBitBoard {
         let is_single_piece = value != 0 && (value & (value - 1)) == 0;
         match is_single_piece {
             true => Ok(MonoBitBoard(value)),
-            false => Err(MonoBitBoardError)
+            false => Err(MonoBitBoardError),
         }
     }
 }
@@ -172,11 +172,15 @@ impl TryFrom<BitBoard> for MonoBitBoard {
 macro_rules! impl_equals {
     ($x:ident, $y:ident) => {
         impl PartialEq for $x {
-            fn eq(&self, other: &Self) -> bool { self.0 == other.0 }
+            fn eq(&self, other: &Self) -> bool {
+                self.0 == other.0
+            }
         }
 
         impl PartialEq<u64> for $x {
-            fn eq(&self, other: &u64) -> bool { self.0 == *other }
+            fn eq(&self, other: &u64) -> bool {
+                self.0 == *other
+            }
         }
 
         impl PartialEq<$y> for $x {
@@ -184,7 +188,7 @@ macro_rules! impl_equals {
                 self.0 == other.0
             }
         }
-    }
+    };
 }
 
 impl_equals!(MonoBitBoard, BitBoard);
@@ -199,7 +203,10 @@ pub struct CellIter {
 impl CellIter {
     /// Creates a new iterator instance with the given [BitBoard]
     pub fn new(bitboard: BitBoard) -> Self {
-        CellIter { bitboard, iter: 0..64 }
+        CellIter {
+            bitboard,
+            iter: 0..64,
+        }
     }
 }
 
@@ -207,7 +214,8 @@ impl Iterator for CellIter {
     type Item = MonoBitBoard;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.by_ref()
+        self.iter
+            .by_ref()
             .find(|index| self.bitboard.0 & (1 << index) != 0)
             .map(|index| MonoBitBoard::new(1 << index).unwrap())
     }

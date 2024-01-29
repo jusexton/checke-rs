@@ -11,8 +11,10 @@ pub struct Turn {
 impl Turn {
     /// Construct a turn from an iterable of items that can be converted into [Move] instances.
     pub fn new<T, I>(moves: I) -> Result<Self, T::Error>
-        where T: TryInto<Move>,
-              I: IntoIterator<Item=T> {
+    where
+        T: TryInto<Move>,
+        I: IntoIterator<Item = T>,
+    {
         let move_results = moves
             .into_iter()
             .map(|m| m.try_into())
@@ -23,9 +25,10 @@ impl Turn {
 
     /// Attempts tp create a [Turn] instance using checkers notation.
     pub fn from_notation(text: &str) -> Result<Self, NotationError> {
-        let parse_result: Result<Vec<Move>, NotationError> = text.split(',')
+        let parse_result = text
+            .split(',')
             .map(Move::try_from)
-            .collect();
+            .collect::<Result<Vec<Move>, NotationError>>();
 
         parse_result.map(|moves| Turn { moves })
     }
@@ -47,7 +50,10 @@ impl TryFrom<&str> for Turn {
 
 /// Allows array of any value that can be converted into a [Move]
 /// to be easily converted into turn instances.
-impl<T, const N: usize> TryFrom<[T; N]> for Turn where T: Into<Move> {
+impl<T, const N: usize> TryFrom<[T; N]> for Turn
+where
+    T: Into<Move>,
+{
     type Error = Infallible;
 
     fn try_from(value: [T; N]) -> Result<Self, Self::Error> {

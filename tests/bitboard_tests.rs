@@ -1,4 +1,4 @@
-use checke_rs::bitboard::{BitBoard, MonoBitBoard, CellIter};
+use checke_rs::bitboard::{BitBoard, CellIter, MonoBitBoard};
 
 #[test]
 fn test_bitboard_equals_u64() {
@@ -38,7 +38,7 @@ fn test_cell_iter_returns_correct_bitboards() {
     let expected_pieces = vec![
         MonoBitBoard::new(0b00000000001).unwrap(),
         MonoBitBoard::new(0b00000100000).unwrap(),
-        MonoBitBoard::new(0b00100000000).unwrap()
+        MonoBitBoard::new(0b00100000000).unwrap(),
     ];
     assert_eq!(pieces, expected_pieces)
 }

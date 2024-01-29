@@ -17,7 +17,7 @@ fn test_turn_created_correctly_from_strings() {
 fn test_turn_created_correctly_from_squares() {
     let moves = [
         (Square::Eleven, Square::Fifteen),
-        (Square::Fifteen, Square::Eighteen)
+        (Square::Fifteen, Square::Eighteen),
     ];
     let turn = Turn::new(moves).unwrap();
 

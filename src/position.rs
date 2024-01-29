@@ -60,17 +60,43 @@ pub enum Square {
 
 impl Square {
     /// Provides an iterator over all square values.
-    pub fn iter() -> impl Iterator<Item=Self> {
+    pub fn iter() -> impl Iterator<Item = Self> {
         [
-            Square::One, Square::Two, Square::Three, Square::Four,
-            Square::Five, Square::Six, Square::Seven, Square::Eight,
-            Square::Nine, Square::Ten, Square::Eleven, Square::Twelve,
-            Square::Thirteen, Square::Fourteen, Square::Fifteen, Square::Sixteen,
-            Square::Seventeen, Square::Eighteen, Square::Nineteen, Square::Twenty,
-            Square::TwentyOne, Square::TwentyTwo, Square::TwentyThree, Square::TwentyFour,
-            Square::TwentyFive, Square::TwentySix, Square::TwentySeven, Square::TwentyEight,
-            Square::TwentyNine, Square::Thirty, Square::ThirtyOne, Square::ThirtyTwo
-        ].iter().copied()
+            Square::One,
+            Square::Two,
+            Square::Three,
+            Square::Four,
+            Square::Five,
+            Square::Six,
+            Square::Seven,
+            Square::Eight,
+            Square::Nine,
+            Square::Ten,
+            Square::Eleven,
+            Square::Twelve,
+            Square::Thirteen,
+            Square::Fourteen,
+            Square::Fifteen,
+            Square::Sixteen,
+            Square::Seventeen,
+            Square::Eighteen,
+            Square::Nineteen,
+            Square::Twenty,
+            Square::TwentyOne,
+            Square::TwentyTwo,
+            Square::TwentyThree,
+            Square::TwentyFour,
+            Square::TwentyFive,
+            Square::TwentySix,
+            Square::TwentySeven,
+            Square::TwentyEight,
+            Square::TwentyNine,
+            Square::Thirty,
+            Square::ThirtyOne,
+            Square::ThirtyTwo,
+        ]
+        .iter()
+        .copied()
     }
 
     /// Returns the square instance represented as a u8.
@@ -113,7 +139,7 @@ impl From<Square> for MonoBitBoard {
             Square::TwentyNine => 0x80,
             Square::Thirty => 0x20,
             Square::ThirtyOne => 0x8,
-            Square::ThirtyTwo => 0x2
+            Square::ThirtyTwo => 0x2,
         };
         MonoBitBoard::new(value).unwrap()
     }
@@ -133,7 +159,9 @@ impl TryFrom<&str> for Square {
 
     /// Converts a number in string format to its square representation
     fn try_from(text: &str) -> Result<Self, Self::Error> {
-        let value = text.parse::<u8>().map_err(|_| NotationError::InvalidFormat)?;
+        let value = text
+            .parse::<u8>()
+            .map_err(|_| NotationError::InvalidFormat)?;
         Square::try_from(value)
     }
 }
@@ -164,13 +192,20 @@ impl Move {
     /// a source and destination. Move validation is expected to be done via other mechanisms.
     pub fn new(source: MonoBitBoard, destination: MonoBitBoard) -> Self {
         let capture = Move::get_capture(source, destination);
-        Move { source, destination, capture }
+        Move {
+            source,
+            destination,
+            capture,
+        }
     }
 
     fn get_capture(source: MonoBitBoard, destination: MonoBitBoard) -> Option<MonoBitBoard> {
         let mut distance = 0;
-        let (mut source, destination) =
-            if source > destination { (source, destination) } else { (destination, source) };
+        let (mut source, destination) = if source > destination {
+            (source, destination)
+        } else {
+            (destination, source)
+        };
 
         while source != destination {
             source >>= 1;
@@ -183,7 +218,7 @@ impl Move {
                 source <<= distance / 2;
                 Some(source)
             }
-            false => None
+            false => None,
         }
     }
 
@@ -199,12 +234,13 @@ impl Move {
     /// Create a new [Move] instance using the given checkers notation text.
     pub fn from_notation(text: &str) -> Result<Self, NotationError> {
         lazy_static! {
-            static ref CN_PATTERN: Regex = Regex::new(r"^([1-9]+[0-9]*)([-xX])([1-9]+[0-9]*)$").unwrap();
+            static ref CN_PATTERN: Regex =
+                Regex::new(r"^([1-9]+[0-9]*)([-xX])([1-9]+[0-9]*)$").unwrap();
         }
 
         match CN_PATTERN.captures(text) {
             Some(captures) => Move::parse_captures(captures),
-            None => Err(NotationError::InvalidFormat)
+            None => Err(NotationError::InvalidFormat),
         }
     }
 
@@ -229,11 +265,15 @@ impl Move {
     }
 
     /// Retrieves a [MonoBitBoard] representing the piece this move captures.
-    pub fn capture(&self) -> Option<MonoBitBoard> { self.capture }
+    pub fn capture(&self) -> Option<MonoBitBoard> {
+        self.capture
+    }
 
     /// Returns a bitboard representing the squares that will change if the move is applied.
     /// This value will be useful when updating a bitboard with a move by applying an xor.
-    pub fn mask(&self) -> BitBoard { self.source | self.destination }
+    pub fn mask(&self) -> BitBoard {
+        self.source | self.destination
+    }
 }
 
 impl TryFrom<&str> for Move {
@@ -259,10 +299,7 @@ impl TryFrom<(Square, Square)> for Move {
 
     /// Converts a tuple of [Square] into a [Move] instance.
     fn try_from(value: (Square, Square)) -> Result<Self, Self::Error> {
-        let m = Move::new(
-            MonoBitBoard::from(value.0),
-            MonoBitBoard::from(value.1),
-        );
+        let m = Move::new(MonoBitBoard::from(value.0), MonoBitBoard::from(value.1));
         Ok(m)
     }
 }
@@ -299,7 +336,7 @@ const RED_PIECE_MOVES: &[BitBoard; 32] = &[
     BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00100000_01000000_00000000),
     BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_10001000_01010000_00000000),
     BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00100010_00010100_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00001000_00000101_00000000)
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00001000_00000101_00000000),
 ];
 
 const BLACK_PIECE_MOVES: &[BitBoard; 32] = &[
@@ -334,7 +371,7 @@ const BLACK_PIECE_MOVES: &[BitBoard; 32] = &[
     BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
     BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
     BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000)
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000),
 ];
 
 const KING_MOVES: &[BitBoard; 32] = &[
@@ -369,7 +406,7 @@ const KING_MOVES: &[BitBoard; 32] = &[
     BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00100000_01000000_00000000),
     BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_10001000_01010000_00000000),
     BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00100010_00010100_00000000),
-    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00001000_00000101_00000000)
+    BitBoard::new(0b00000000_00000000_00000000_00000000_00000000_00001000_00000101_00000000),
 ];
 
 /// Capable of generating all possible moves. The key different between [MoveGenerator]
@@ -383,14 +420,19 @@ struct MoveGenerator<'a> {
 impl<'a> MoveGenerator<'a> {
     /// Creates a new [MoveGenerator] instance given a [BoardState] reference and [Player].
     pub fn new(board_state: &'a BoardState, player: Player) -> Self {
-        MoveGenerator { board_state, player }
+        MoveGenerator {
+            board_state,
+            player,
+        }
     }
 
     /// Provides an iterator of moves given a specific board cell.
-    pub fn by_cell(&self, cell: MonoBitBoard) -> impl Iterator<Item=Move> {
+    pub fn by_cell(&self, cell: MonoBitBoard) -> impl Iterator<Item = Move> {
         let inf_cell_iter = [cell].into_iter().cycle();
         let moves_by_cell = self.moves_by_cell(cell);
-        inf_cell_iter.zip(moves_by_cell).map(|m| Move::try_from(m).unwrap())
+        inf_cell_iter
+            .zip(moves_by_cell)
+            .map(|m| Move::try_from(m).unwrap())
     }
 
     fn moves_by_cell(&self, cell: MonoBitBoard) -> CellIter {
@@ -399,11 +441,15 @@ impl<'a> MoveGenerator<'a> {
             .used_cells()
     }
 
-    fn get_move_bitboard(&self,
-                         board_state: &BoardState,
-                         player: Player,
-                         cell: MonoBitBoard) -> Option<&BitBoard> {
-        let Ok(square) = Square::try_from(cell) else { return None; };
+    fn get_move_bitboard(
+        &self,
+        board_state: &BoardState,
+        player: Player,
+        cell: MonoBitBoard,
+    ) -> Option<&BitBoard> {
+        let Ok(square) = Square::try_from(cell) else {
+            return None;
+        };
 
         let move_index = (square.to_number() - 1) as usize;
         let is_king = board_state.is_king(cell);
@@ -411,8 +457,8 @@ impl<'a> MoveGenerator<'a> {
             true => KING_MOVES.get(move_index),
             false => match player {
                 Player::Red => RED_PIECE_MOVES.get(move_index),
-                Player::Black => BLACK_PIECE_MOVES.get(move_index)
-            }
+                Player::Black => BLACK_PIECE_MOVES.get(move_index),
+            },
         };
 
         move_bitboard
@@ -428,7 +474,9 @@ pub enum MoveError {
     #[error("A piece did not exist at the provided source square.")]
     NoPieceAtSource,
 
-    #[error("The selected piece to move did not belong to the player color that was allowed to move.")]
+    #[error(
+        "The selected piece to move did not belong to the player color that was allowed to move."
+    )]
     WrongPlayerPiece,
 
     #[error("The provided destination was illegal. The selected piece can not legally move to the provided destination.")]
@@ -456,7 +504,10 @@ impl<'a> MoveValidator<'a> {
     }
 
     /// Validates a given move is valid per this validator's board state.
-    pub fn validate<T>(&self, m: T) -> Result<(), MoveError> where T: TryInto<Move> {
+    pub fn validate<T>(&self, m: T) -> Result<(), MoveError>
+    where
+        T: TryInto<Move>,
+    {
         let m = m.try_into().map_err(|_| MoveError::InvalidConstruction)?;
 
         self.valid_piece_selection(&m)?;
@@ -510,7 +561,11 @@ impl<'a> MoveIter<'a> {
         let generator = MoveGenerator::new(board_state, player);
         let validator = MoveValidator::new(board_state);
 
-        MoveIter { player_pieces, generator, validator }
+        MoveIter {
+            player_pieces,
+            generator,
+            validator,
+        }
     }
 }
 

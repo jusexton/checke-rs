@@ -5,6 +5,6 @@
 extern crate num_derive;
 
 pub mod bitboard;
-pub mod turn;
-pub mod position;
 pub mod board;
+pub mod position;
+pub mod turn;
